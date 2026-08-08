@@ -1,0 +1,49 @@
+# Default values for the mysql sub-chart.
+# Any of these are overridable from the parent (todoapp) chart's values.yaml
+# under a top-level `mysql:` key.
+
+namespace:
+  name: mysql
+
+replicaCount: 2
+
+image:
+  repository: mysql
+  tag: "8.0"
+  pullPolicy: IfNotPresent
+
+mysqlDatabase: app_db
+
+secrets:
+  MYSQL_ROOT_PASSWORD: "MTIzNA=="
+  MYSQL_USER: "YXBwX3VzZXI="
+  MYSQL_PASSWORD: "MTIzNA=="
+
+pvc:
+  storage: 2Gi
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+
+affinity:
+  key: app
+  values:
+    - mysql
+
+toleration:
+  key: app
+  value: mysql
+  effect: NoSchedule
+
+initSql: |
+  GRANT ALL PRIVILEGES ON app_db.* TO 'app_user'@'%';
+  USE app_db;
+  CREATE TABLE counter (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      value INT
+  );

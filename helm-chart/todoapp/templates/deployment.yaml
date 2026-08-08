@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}
+  namespace: {{ .Values.namespace.name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: {{ .Values.rollingUpdate.maxSurge }}
+      maxUnavailable: {{ .Values.rollingUpdate.maxUnavailable }}
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+        - name: app-secrets-volume
+          mountPath: "/app/secrets"
+          readOnly: true
+        - name: app-config-volume
+          mountPath: "/app/configs"
+          readOnly: true
+        resources:
+          requests:
+            memory: {{ .Values.resources.requests.memory | quote }}
+            cpu: {{ .Values.resources.requests.cpu | quote }}
+          limits:
+            memory: {{ .Values.resources.limits.memory | quote }}
+            cpu: {{ .Values.resources.limits.cpu | quote }}
+        env:
+        - name: PYTHONUNBUFFERED
+          valueFrom:
+            configMapKeyRef:
+              name: {{ .Chart.Name }}-config
+              key: PYTHONUNBUFFERED
+        {{- range $key, $value := .Values.secrets }}
+        - name: {{ $key }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Chart.Name }}-secret
+              key: {{ $key }}
+        {{- end }}
+        ports:
+        - containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.probes.liveness.path }}
+            port: {{ .Values.probes.liveness.port }}
+          initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.probes.readiness.path }}
+            port: {{ .Values.probes.readiness.port }}
+          initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ .Chart.Name }}-{{ .Values.pvc.name }}
+      - name: app-secrets-volume
+        secret:
+          secretName: {{ .Chart.Name }}-secret
+      - name: app-config-volume
+        configMap:
+          name: {{ .Chart.Name }}-config
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: {{ .Values.affinity.nodeAffinity.weight }}
+            preference:
+              matchExpressions:
+              - key: {{ .Values.affinity.nodeAffinity.key }}
+                operator: {{ .Values.affinity.nodeAffinity.operator }}
+                values:
+                {{- range .Values.affinity.nodeAffinity.values }}
+                - {{ . }}
+                {{- end }}

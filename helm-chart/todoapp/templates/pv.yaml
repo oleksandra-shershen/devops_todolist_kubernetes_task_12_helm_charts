@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Chart.Name }}-{{ .Values.pv.name }}
+  namespace: {{ .Values.namespace.name }}
+spec:
+  storageClassName: {{ .Values.pv.storageClassName }}
+  persistentVolumeReclaimPolicy: {{ .Values.pv.reclaimPolicy }}
+  accessModes:
+    {{- range .Values.pv.accessModes }}
+    - {{ . }}
+    {{- end }}
+  capacity:
+    storage: {{ .Values.pv.capacity }}
+  hostPath:
+    path: {{ .Values.pv.hostPath }}
