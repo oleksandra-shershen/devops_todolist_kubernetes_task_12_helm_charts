@@ -1,4 +1,4 @@
-# Instruction
+# INSTRUCTION.md
 
 Steps to validate the `todoapp` Helm chart (and its `mysql` sub-chart) on a
 local `kind` cluster.
@@ -84,7 +84,21 @@ helm template todoapp helm-chart/todoapp | less   # optional: eyeball rendered m
 
 `helm dependency build` reads the `dependencies:` block in
 `helm-chart/todoapp/Chart.yaml` (`name: mysql`) and produces
-`Chart.lock` plus a packaged `charts/mysql-0.1.0.tgz`.
+`Chart.lock` plus a packaged `charts/mysql-0.1.0.tgz`. Do this **before**
+the dry-run/install commands below — without it, the `mysql` sub-chart
+manifests won't render (Helm will error that the dependency is declared
+in `Chart.yaml` but not built/found).
+
+You can preview the fully rendered manifests (with `values.yaml` already
+merged in) without touching the cluster:
+
+```bash
+# todoapp chart (includes the mysql sub-chart's resources too)
+helm install todoapp-release helm-chart/todoapp --dry-run
+
+# mysql sub-chart in isolation
+helm install todoapp-release helm-chart/todoapp/charts/mysql --dry-run
+```
 
 ## 7. Deploy
 
@@ -98,7 +112,7 @@ chmod +x bootstrap.sh
 or install manually:
 
 ```bash
-helm upgrade --install todoapp helm-chart/todoapp \
+helm upgrade --install todoapp-release helm-chart/todoapp \
   --create-namespace --namespace todoapp
 ```
 
@@ -108,6 +122,16 @@ sub-chart's) also create the `todoapp` / `mysql` namespaces from
 --create-namespace` on the Helm command just tells Helm which namespace
 to install release *metadata* into; the actual workload namespaces come
 from the templates.
+
+You can inspect the release's upgrade/rollback history at any point:
+
+```bash
+helm history todoapp-release -n todoapp
+```
+
+(only useful once at least one `helm install`/`upgrade` has actually run
+against the cluster — the `--dry-run` commands above don't create a
+release, so they won't show up here.)
 
 ## 8. Wait for rollout
 
@@ -181,12 +205,6 @@ few list items to confirm the app can read and write through MySQL.
 ## 11. Tear down
 
 ```bash
-helm uninstall todoapp -n todoapp
+helm uninstall todoapp-release -n todoapp
 kind delete cluster --name todoapp-cluster
 ```
-
-## 12. Pull Request
-
-Push the branch to your fork and open a PR against the upstream
-repository, including `INSTRUCTION.md`, `bootstrap.sh`, `cluster.yml`,
-`output.log`, and the `helm-chart/` directory, for review.
